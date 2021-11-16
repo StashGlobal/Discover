@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net5.0</TargetFramework>
+    <ApplicationIcon>Stash-Final-HOnly-16x14.ico</ApplicationIcon>
+    <StartupObject>Stash.Discover.DiscoverMain</StartupObject>
+    <Authors>Stash Global, Inc</Authors>
+    <Description>Data locator, identifier and analyzer</Description>
+    <Copyright>(c) 2021 - Stash Global, Inc.</Copyright>
+    <PackageLicenseExpression>MIT License</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/StashGlobal/Discover</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/StashGlobal/Discover</RepositoryUrl>
+    <RepositoryType>GitHub</RepositoryType>
+    <PackageTags>Stash, data, data-centric, e-discovery, unstructured, mime</PackageTags>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <Product>STASH Discover</Product>
+    <PackageId>STASH Discover</PackageId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommandLineParser" Version="2.8.0" />
+    <PackageReference Include="Mime" Version="3.2.3" />
+  </ItemGroup>
+
+</Project>
