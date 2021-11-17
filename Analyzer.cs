@@ -18,6 +18,7 @@ namespace Stash.Discover
         public bool continueRunning = false;                // Set to F by DiscoverMain when scanner is done
         private string _strCurrentAnalyzerFilePath;             // Holds the file being analyzed
         private uint _intAnalyzerFileCount;                    // Holds the number of files that have been analyzed
+        private string _strAnalyzerErrorMessage = "";               // Tracks non-fatal error messages for printing to screen
 
         #region Public Events
         public event PropertyChangedEventHandler PropertyChanged;
@@ -48,6 +49,20 @@ namespace Stash.Discover
                 if (this._intAnalyzerFileCount != value)
                 {
                     this._intAnalyzerFileCount = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+
+        // Used to track error or warning messages that are not fatal
+        public string strAnalyzerErrorMessage
+        {
+            get { return this._strAnalyzerErrorMessage; }
+            set
+            {
+                if (this._strAnalyzerErrorMessage != value)
+                {
+                    this._strAnalyzerErrorMessage = value;
                     NotifyPropertyChanged();
                 }
             }

@@ -23,4 +23,9 @@
     <PackageReference Include="Mime" Version="3.2.3" />
   </ItemGroup>
 
+  <!-- 
+  <Target Name="PostPublish" AfterTargets="Publish">
+    <Exec Command="$(PublishDir)..\postpublishtasks.bat $(PublishDir) $(PublishUrl) $(ILMergeConsolePath)" />
+  </Target>
+  -->
 </Project>

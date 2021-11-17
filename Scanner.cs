@@ -16,8 +16,11 @@ namespace Stash.Discover
     // Locates files using specified filter criteria
     class Scanner : INotifyPropertyChanged
     {
+        private string _strCurrentDirPath = "";             // Tracks the current path the scanning is on
         private string _strCurrentFilePath = "";            // Tracks the current file & path the scanner is on
+        private string _strCurrentFilePathMimeMatch = "";   // Tracks the current file which matches the scanner's configured MIME types
         private uint _intFileCount = 0;                     // Tracks the number of files this scanner instance has identified so far
+        private string _strErrorMessage = "";               // Tracks non-fatal error messages for printing to screen
         private ConcurrentQueue<DiscoveredItem> cq = null;  // Pointer to the master queue managed by DiscoverMain
         private List<string> excludeDirectories = null;     // Stores the directories to ignore
         private List<string> fileTypes = null;              // Stores the file MIME types we are searching for
@@ -50,6 +53,19 @@ namespace Stash.Discover
         // When the scanner updates these properties, it will notify DiscoverMain, which then updates the display
         // These properties are monitored by Output.cs:UpdateDisplay() - the property change handlers are set in DiscoverMain.cs:Main()
 
+        public string strCurrentDirPath
+        {
+            get { return this._strCurrentDirPath; }
+            set
+            {
+                if (this._strCurrentDirPath != value)
+                {
+                    this._strCurrentDirPath = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+
         public string strCurrentFilePath
         {
             get { return this._strCurrentFilePath; }
@@ -63,6 +79,19 @@ namespace Stash.Discover
             }
         }
 
+        public string strCurrentFilePathMimeMatch
+        {
+            get { return this._strCurrentFilePathMimeMatch; }
+            set
+            {
+                if (this._strCurrentFilePathMimeMatch != value)
+                {
+                    this._strCurrentFilePathMimeMatch = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+
         public uint intFileCount
         {
             get { return this._intFileCount; }
@@ -71,6 +100,20 @@ namespace Stash.Discover
                 if (this._intFileCount != value)
                 {
                     this._intFileCount = value;
+                    NotifyPropertyChanged();
+                }
+            }
+        }
+
+        // Used to track error or warning messages that are not fatal
+        public string strErrorMessage
+        {
+            get { return this._strErrorMessage; }
+            set
+            {
+                if (this._strErrorMessage != value)
+                {
+                    this._strErrorMessage = value;
                     NotifyPropertyChanged();
                 }
             }
@@ -127,27 +170,40 @@ namespace Stash.Discover
                 if (this.excludeDirectories.BinarySearch(pathIn) >= 0) { return; }
 
                 // Get all files in the directory
-                System.IO.DirectoryInfo dirInfo = new System.IO.DirectoryInfo(pathIn);
-                foreach (System.IO.FileInfo fi in dirInfo.GetFiles()) 
+                try
                 {
-                    // Get file MIME type and if its on the 'analyze' list, queue it
-                    string strMime = MimeGuesser.GuessMimeType(fi);
-                    if (this.fileTypes.BinarySearch(strMime) >= 0)
+                    System.IO.DirectoryInfo dirInfo = new System.IO.DirectoryInfo(pathIn);
+                    this.strCurrentDirPath = dirInfo.FullName;
+                    foreach (System.IO.FileInfo fi in dirInfo.GetFiles())
                     {
-                        DiscoveredItem di = new DiscoveredItem(fi.FullName);
-                        di.fileMimeType = strMime;
-                        this.cq.Enqueue(di);
-                        Monitor.Enter(this);
-                        this.intFileCount++;
-                        Monitor.Exit(this);
+                        // Get file MIME type and if its on the 'analyze' list, queue it
                         this.strCurrentFilePath = fi.FullName;
+                        string strMime = MimeGuesser.GuessMimeType(fi);
+                        if (this.fileTypes.BinarySearch(strMime) >= 0)
+                        {
+                            DiscoveredItem di = new DiscoveredItem(fi.FullName);
+                            di.fileMimeType = strMime;
+                            this.cq.Enqueue(di);
+                            Monitor.Enter(this);
+                            this.intFileCount++;
+                            Monitor.Exit(this);
+                            this.strCurrentFilePathMimeMatch = fi.FullName;
+                        }
+                    }
+
+                    // Recurse on all subdirectories in the directory
+                    foreach (System.IO.DirectoryInfo subDirInfo in dirInfo.GetDirectories())
+                    {
+                        await this.Go(subDirInfo.FullName);
                     }
                 }
-
-                // Recurse on all subdirectories in the directory
-                foreach (System.IO.DirectoryInfo subDirInfo in dirInfo.GetDirectories())
+                catch (System.UnauthorizedAccessException ue)
                 {
-                    await this.Go(subDirInfo.FullName);
+                    this.strErrorMessage = "Skipping Directory, " + ue.Message; 
+                }
+                catch (Exception ex)
+                {
+                    this.strErrorMessage = ex.Message;
                 }
             }
         }
