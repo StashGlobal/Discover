@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.ComponentModel;                // For computed properties and notifications
 using System.Runtime.CompilerServices;      // For computed properties and notifications
@@ -25,10 +26,20 @@ namespace Stash.Discover
         // https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Common_types
         // https://www.iana.org/assignments/media-types/media-types.xhtml
         //
-        private List<string> defaultFileTypes = new List<string> {
+        private static List<string> defaultFileTypes = new List<string> {
             "text/csv",
             "image/jpeg",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.ms-excel",
+            "application/vnd.ms-powerpoint",
+            "application/msword",
+            "application/vnd.oasis.opendocument.text",
+            "application/vnd.oasis.opendocument.spreadsheet",
+            "application/vnd.oasis.opendocument.presentation",
+            "application/pdf",
+            "application/vnd.visio",
         };
 
         #region Public Events
@@ -77,7 +88,7 @@ namespace Stash.Discover
                 this.fileTypes = fileTypesIn.Split(',').ToList();
             } else
             {
-                this.fileTypes = this.defaultFileTypes;
+                this.fileTypes = Scanner.defaultFileTypes;
             }
             this.fileTypes.Sort();
 
@@ -126,8 +137,9 @@ namespace Stash.Discover
                         DiscoveredItem di = new DiscoveredItem(fi.FullName);
                         di.fileMimeType = strMime;
                         this.cq.Enqueue(di);
-                        
+                        Monitor.Enter(this);
                         this.intFileCount++;
+                        Monitor.Exit(this);
                         this.strCurrentFilePath = fi.FullName;
                     }
                 }
@@ -150,5 +162,15 @@ namespace Stash.Discover
         }
         #endregion
 
+        public static void ListDefaultFileTypes()
+        {
+            Console.WriteLine("Default File Types Located by Scanner: ");
+
+            Array FileTypes = Scanner.defaultFileTypes.ToArray();
+            foreach (string fileType in FileTypes) 
+            {
+                Console.WriteLine(fileType);
+            }
+        }
     }
 }

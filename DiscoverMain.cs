@@ -24,19 +24,22 @@ namespace Stash.Discover
     class DiscoverMain 
     {
         private bool verbosity = false;             // T to enable more output
+        private bool listFileTypes = false;         // T to dump the default file types and exit
         private string fileTypes = "";              // A comma-separated list of file types to identify and analyze, defaults are set in Scanner.cs
         private string basePath = "";               // The directory to start the scanner from, defaults to root of file system (all drives on Windows or '/' on Linux/MacOSX)
         private string excludePaths = "";            // A comma-separate list of directories to exclude
         private byte numThreads = 3;                // Number of threads to use for the analysis by Analyzer
+        private string outputFile = "." + Path.DirectorySeparatorChar + "discover.json";
         private int returnCode = 0;                 // The return code to set when program exits
         private Scanner scanner = null;             // The scanner object
         private Output output = null;               // The output object
         private Analyzer analyzer = null;           // The analyzer object
         private ConcurrentQueue<DiscoveredItem> cq = null;  // A global thread-safe queue to store the files for analysis
-        //private List<Task> runningTasks = new List<Task>();
+        private ConcurrentQueue<DiscoveredItem> outputCQ = null;    // A global thread-safe queue to store output information
         private Task[] taskScanner = null;
         private Task[] taskAnalyzer = null;
-        
+        private Task[] taskOutput = null;
+
         public class Options
         {
             [Option('p', "path", Required = false, HelpText = "Base path to start scanner in (default root of the file system)")]
@@ -48,9 +51,15 @@ namespace Stash.Discover
             [Option('t', "types", Required = false, HelpText = "Comma-separated list of MIME types the Scanner should identify and analyze")]
             public string FileTypes { get; set; }
 
+            [Option('l', "list", Required = false, HelpText = "List default MIME types the Scanner will locate and identify")]
+            public bool ListFileTypes { get; set; }
+
             [Option('n', "threads", Required = false, HelpText = "Number of threads to use for analysis (default 3)")]
             public byte NumThreads { get; set; }
-            
+
+            [Option('o', "output", Required = false, HelpText = "Name and path to output file (default discover json)")]
+            public string OutputFile { get; set; }
+
             [Option('v', "verbose", Required = false, HelpText = "See verbose output messages.")]
             public bool Verbose { get; set; }
         }
@@ -61,12 +70,35 @@ namespace Stash.Discover
             {
                 throw new ArgumentOutOfRangeException("Threads", "Invalid Number of Threads (must be 1-20)");
             }
+            if (this.outputFile == "")
+            {
+                throw new ArgumentOutOfRangeException("output", "Output File Cannot be Blank");
+            }
+            
+            // Check output file directory exists
+            System.IO.FileInfo fi = new System.IO.FileInfo(this.outputFile);
+            System.IO.DirectoryInfo di = new System.IO.DirectoryInfo(fi.DirectoryName);
+            if (fi.DirectoryName != "" && ! di.Exists)
+            {
+                throw new ArgumentOutOfRangeException("output", "Ouput Directory Does Not Exist");
+            }
 
+            // Check if file exists, and prompt for overwrite
+            if (System.IO.File.Exists(this.outputFile))
+            {
+                Console.WriteLine("Output File Exists - Overwrite? (y/n)");
+                ConsoleKeyInfo cKI = Console.ReadKey();
+                if (cKI.Key != ConsoleKey.Y)
+                {
+                    Environment.Exit(-1);
+                }
+            }
         }
 
         public DiscoverMain()
         {
             this.cq = new ConcurrentQueue<DiscoveredItem>();
+            this.outputCQ = new ConcurrentQueue<DiscoveredItem>();
         }
 
         static void Main(string[] args)
@@ -80,6 +112,7 @@ namespace Stash.Discover
                    .WithParsed<Options>(o =>
                    {
                        if (o.Verbose) { cliProgram.verbosity = true; }
+                       if (o.ListFileTypes) { cliProgram.listFileTypes = true; }
                        if (o.FileTypes != null && o.FileTypes != "") { cliProgram.fileTypes = o.FileTypes; }
                        if (o.BasePath != null && o.BasePath != "") { cliProgram.basePath = o.BasePath; }
                        if (o.ExcludePaths != null && o.ExcludePaths != "") { cliProgram.excludePaths = o.ExcludePaths; }
@@ -87,13 +120,18 @@ namespace Stash.Discover
                    })
                    .WithNotParsed<Options>((errs) => HandleParseErrors(errs));
 
+                if (cliProgram.listFileTypes)
+                {
+                    Scanner.ListDefaultFileTypes();
+                    Environment.Exit(0);
+                }
                 // Sanity check the arguments
                 cliProgram.ArgCheck();
 
                 // Create the scanner and output objects that depend on the command line options
                 cliProgram.scanner = new Scanner(cliProgram.cq, cliProgram.fileTypes, cliProgram.excludePaths);
-                cliProgram.analyzer = new Analyzer(cliProgram.cq);
-                cliProgram.output = new Output();
+                cliProgram.analyzer = new Analyzer(cliProgram.cq, cliProgram.outputCQ);
+                cliProgram.output = new Output(cliProgram.outputCQ);
 
                 // Set the property notification handlers
                 cliProgram.scanner.PropertyChanged += cliProgram.output.UpdateDisplay;      // Connect output routines to scanner
@@ -107,14 +145,6 @@ namespace Stash.Discover
                     })
                 };
 
-                // Works
-                //cliProgram.taskAnalyzer = new Task[] {
-                //Task.Run(async delegate
-                //    {
-                //        await cliProgram.analyzer.Go();
-                //    })
-                //};
-
                 cliProgram.taskAnalyzer = new Task[] {
                 Task.Run(delegate
                     {
@@ -122,37 +152,13 @@ namespace Stash.Discover
                     })
                 };
 
-                //cliProgram.taskScanner.Append<Task>(Task.Run(async delegate
-                //{
-                //    await cliProgram.scanner.Go(cliProgram.basePath);
-                //}));
-
-                //cliProgram.runningTasks.Add(
-                //    Task.Run(async delegate
-                //    {
-                //        await cliProgram.scanner.Go(cliProgram.basePath);
-                //    }));
-
-                // how to have analyzer handle queue AND wait until scanner is done before exiting...
-                // Task waitall, then kill parallel invoke when done?
-
-                //int outerSum = 0;
-                //// An action to consume the ConcurrentQueue.
-                //Action action = () =>
-                //{
-                //    int localSum = 0;
-                //    int localValue;
-                //    while (cq.TryDequeue(out localValue)) localSum += localValue;
-                //    Interlocked.Add(ref outerSum, localSum);
-                // handle queue item or wait 1 second if not queue items left before querying again?
-                //};
-
-                //// Start 4 concurrent consuming actions.
-                //Parallel.Invoke(action, action, action, action);
-
-
-
-                //Task.WaitAll(cliProgram.runningTasks.ToArray());
+                cliProgram.taskOutput = new Task[]
+                {
+                Task.Run(async delegate
+                    {
+                        await cliProgram.output.Go(cliProgram.outputFile);
+                    })
+                };
 
                 // Wait for scanner task to finish
                 Task.WaitAll(cliProgram.taskScanner);
@@ -162,57 +168,12 @@ namespace Stash.Discover
                 // Wait for analyzer task to finish
                 Task.WaitAll(cliProgram.taskAnalyzer);
 
+                cliProgram.output.continueRunning = false;
 
-                //this.objStash.runningTasks.Add(
-                //    Task.Run(async delegate
-                //    {
-                //        await this.objStash.EventWorker.HandleEventsErrored(this.objStash.EventWorker.cts.Token);
-                //    });
+                // Wait for the output task to finish
+                Task.WaitAll(cliProgram.taskOutput);
 
-
-
-                //Task.Run(async delegate
-                //{
-                //    //await this.objStash.EventWorker.HandleEvents(this.objStash.EventWorker.cts.Token);
-                //    await BackupEvent.HandleRenameNotFound(objStash, this.EventPath, this.EventPathDest);
-
-                //});
-
-
-
-                //    this.objStash.runningTasks.Add(
-                //    Task.Run(async delegate
-                //    {
-                //        await this.objStash.EventWorker.HandleEventsErrored(this.objStash.EventWorker.cts.Token);
-                //    })
-
-                //);
-
-
-
-                //await Task.Run(() => {
-                //    if (this.objStash != null && !this.objStash.StartSync(out string errMsg))
-                //    {
-                //        System.Windows.MessageBox.Show("An Error Occurred Starting Sync - " + errMsg, "Unable to Start Sync", MessageBoxButton.OK, MessageBoxImage.Error);
-                //        this.cmdStop.Visibility = Visibility.Hidden;
-                //        this.cmdStart.Visibility = Visibility.Visible;
-                //    }
-                //});
-
-
-
-                //int outerSum = 0;
-                //// An action to consume the ConcurrentQueue.
-                //Action action = () =>
-                //{
-                //    int localSum = 0;
-                //    int localValue;
-                //    while (cq.TryDequeue(out localValue)) localSum += localValue;
-                //    Interlocked.Add(ref outerSum, localSum);
-                //};
-
-                //// Start 4 concurrent consuming actions.
-                //Parallel.Invoke(action, action, action, action);
+                cliProgram.output.finishOutputFile(cliProgram.outputFile);
 
                 cliProgram.returnCode = 0;
             }

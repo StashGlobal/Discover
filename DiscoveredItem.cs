@@ -9,12 +9,17 @@ namespace Stash.Discover
 {
     class DiscoveredItem
     {
-        public string fileName;
-        public long fileSize;
-        public DateTime fileDTS;
-        public string fileAnalysis;
-        public string fileMimeType;
-        public string filePath;
+        public string fileName { get; set; }
+        public long fileSize { get; set; }
+        public DateTime fileDTS { get; set; }
+        public string fileAnalysis { get; set; }
+        public string fileMimeType { get; set; }
+        public string filePath { get; set; }
+
+        public override string ToString()
+        {
+            return "Discovered Item, File: " + this.filePath + " MIME: " + this.fileMimeType + " Size: " + this.fileSize + " Analysis: " + this.fileAnalysis;
+        }
 
         public DiscoveredItem()
         {
