@@ -19,6 +19,7 @@ namespace Stash.Discover
 {   
     // Main program entry, command line parsing, and output control
     // Return Codes:
+    //  -2 - Manual interrupt with Ctrl-C
     //  -1 - Command line options parse error
     //  0 - Success
     //  Positve number - the number of files matched by the scanner and configured MIME types
@@ -48,7 +49,7 @@ namespace Stash.Discover
             [Option('p', "path", Required = false, HelpText = "Base path to start scanner in (default root of the file system)")]
             public string BasePath { get; set; }
 
-            [Option('e', "exclude path", Required = false, HelpText = "Comma-separated list of directories to exclude from the scanner (default none)")]
+            [Option('e', "exclude path", Required = false, HelpText = "Comma-separated list of directories to exclude from the scanner (default none, NOT case sensitive)")]
             public string ExcludePaths { get; set; }
 
             [Option('t', "types", Required = false, HelpText = "Comma-separated list of MIME types the Scanner should identify and analyze")]
@@ -176,11 +177,13 @@ namespace Stash.Discover
                 // Set the property notification handlers
                 cliProgram.scanner.PropertyChanged += cliProgram.output.UpdateDisplay;      // Connect output routines to scanner
                 cliProgram.analyzer.PropertyChanged += cliProgram.output.UpdateDisplay;   // Connect output routines to analyzer
+                Console.CancelKeyPress += cliProgram.ManualCancel;
 
                 // Setup console output parameters - all startup output should be done by now
                 cliProgram.output.setConsoleOrigins();
 
                 // Kick off scanner and analyzer threads - then wait until scanner and analyzer report 'done'
+                cliProgram.scanner.continueRunning = true;
                 cliProgram.taskScanner = new Task[] {
                 Task.Run(async delegate
                     {
@@ -246,6 +249,28 @@ namespace Stash.Discover
         public static void HandleParseErrors(IEnumerable<Error> errs)
         {
             Environment.Exit(-1);
+        }
+
+        protected void ManualCancel(object sender, ConsoleCancelEventArgs args)
+        {
+            Console.CursorTop = this.output.getConsoleNextLine() + 1;
+            Console.WriteLine("Shutting down Discover...");
+
+            // Kill scanner
+            Console.WriteLine("Killing scanner processs...");
+            this.scanner.continueRunning = false;
+            Task.WaitAll(this.taskScanner);
+
+            // Kill analyzer
+            Console.WriteLine("Killing analyzer process...");
+            this.analyzer.continueRunning = false;
+            Task.WaitAll(this.taskAnalyzer);
+
+            Console.WriteLine("Finalizing output file...");
+            this.output.finishOutputFile(this.outputFile);
+
+            Console.WriteLine("Done...");
+            Environment.Exit(-2);
         }
         #endregion
     }

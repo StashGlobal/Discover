@@ -24,6 +24,7 @@ namespace Stash.Discover
         private ConcurrentQueue<DiscoveredItem> cq = null;  // Pointer to the master queue managed by DiscoverMain
         private List<string> excludeDirectories = null;     // Stores the directories to ignore
         private List<string> fileTypes = null;              // Stores the file MIME types we are searching for
+        public bool continueRunning = false;               // Flag to track when scanner should shut down (e.g. CTRL-C pressed)
 
         // Default search files (MIME Types):
         // https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Common_types
@@ -137,7 +138,7 @@ namespace Stash.Discover
 
             // Parse the list of excluded directories into a sorted List
             if (excludeDirectoriesIn != "") {
-                this.excludeDirectories = excludeDirectoriesIn.Split(',').ToList();
+                this.excludeDirectories = excludeDirectoriesIn.Split(',').ToList().ConvertAll(d => d.ToLower());
                 this.excludeDirectories.Sort();
             } else
             {
@@ -167,7 +168,7 @@ namespace Stash.Discover
             } else
             {
                 //if (this.excludeDirectories.Contains(pathIn)) { return; }       // Skip a directory if in the exclude list
-                if (this.excludeDirectories.BinarySearch(pathIn) >= 0) { return; }
+                if (this.excludeDirectories.BinarySearch(pathIn.ToLower()) >= 0) { return; }
 
                 // Get all files in the directory
                 try
@@ -176,6 +177,8 @@ namespace Stash.Discover
                     this.strCurrentDirPath = dirInfo.FullName;
                     foreach (System.IO.FileInfo fi in dirInfo.GetFiles())
                     {
+                        if (! this.continueRunning) { return; }
+
                         // Get file MIME type and if its on the 'analyze' list, queue it
                         this.strCurrentFilePath = fi.FullName;
                         string strMime = MimeGuesser.GuessMimeType(fi);

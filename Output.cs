@@ -48,6 +48,9 @@ namespace Stash.Discover
             {
                 if (e == null || e.PropertyName == "") { return; }
                 int IntConsoleWidth = Console.WindowWidth;
+                int IntBuffer = 5;
+                int IntCounterSize = 10;
+                int IntTurnSize = 1;
                 string StrMessage = "";
                 Monitor.Enter(this);
                 if (e.PropertyName == "strCurrentDirPath" || e.PropertyName == "intFileCount")
@@ -57,13 +60,22 @@ namespace Stash.Discover
                     Console.CursorLeft = 1; Console.CursorTop = this.ScannerRow;
                     this.Turn(ref this.ScannerCounter);
                     string tDirPath = ((Scanner)sender).strCurrentDirPath;
-                    if (tDirPath.Length > IntConsoleWidth - 30)
-                    {   // 75 characters reserved for file path message
-                        StrMessage = " - File Count: " + ((Scanner)sender).intFileCount + " - Dir: " + tDirPath.Substring(0, 20) + "..." + tDirPath.Substring(tDirPath.Length - 50);
+                    string tHeader = " | Scanner  | ";
+                    string tCounter = "Matched Count: ";
+                    string tDir = " Dir: ";
+                    string tDirSeparator = "...";
+                    int availMessageLength = IntConsoleWidth - IntBuffer - IntTurnSize - tHeader.Length - tCounter.Length - IntCounterSize - tDir.Length;
+                    StrMessage = tHeader + tCounter + ((Scanner)sender).intFileCount + tDir;
+                    if (tDirPath.Length > availMessageLength)
+                    {
+                        // Get some substring of tDirPath that fits in availMessageLength (e.g. 30% of first, 70% of last)?
+                        int IntStartLength = (int)Math.Floor((double)(availMessageLength * .3));
+                        int IntEndLength = availMessageLength - IntStartLength - tDirSeparator.Length;
+                        StrMessage += tDirPath.Substring(0, IntStartLength) + "..." + tDirPath.Substring(tDirPath.Length - IntEndLength);
                     }
                     else
                     {
-                        StrMessage = " - File Count: " + ((Scanner)sender).intFileCount + " - Dir: " + tDirPath;
+                        StrMessage += tDirPath;
                     }
                     Console.Write(StrMessage);
                     Console.Write(new string(' ', IntConsoleWidth - StrMessage.Length - 1));
@@ -84,14 +96,23 @@ namespace Stash.Discover
                 {
                     Console.CursorLeft = 1; Console.CursorTop = this.AnalyzerRow;
                     this.Turn(ref this.AnalyzerCounter);
-                    if (((Analyzer)sender).strCurrentAnalyzerFilePath.Length > IntConsoleWidth - 35)
-                    {   // 65 characters reserved for file path message
-                        string tFilePath = ((Analyzer)sender).strCurrentAnalyzerFilePath;
-                        StrMessage = " - Analyzed File Count: " + ((Analyzer)sender).intAnalyzerFileCount + " - File: " + tFilePath.Substring(0, 20) + "..." + tFilePath.Substring(tFilePath.Length - 40);
+                    string tFilePath = ((Analyzer)sender).strCurrentAnalyzerFilePath;
+                    string tHeader = " | Analyzer | ";
+                    string tCounter = "Count: ";
+                    string tFile = " File: ";
+                    string tFileSeparator = "...";
+                    int availMessageLength = IntConsoleWidth - IntBuffer - IntTurnSize - tHeader.Length - tCounter.Length - IntCounterSize - tFile.Length;
+                    StrMessage = tHeader + tCounter + ((Analyzer)sender).intAnalyzerFileCount + tFile;
+                    if (tFilePath.Length > availMessageLength)
+                    {
+                        // Get some substring of tDirPath that fits in availMessageLength (e.g. 30% of first, 70% of last)?
+                        int IntStartLength = (int)Math.Floor((double)(availMessageLength * .3));
+                        int IntEndLength = availMessageLength - IntStartLength - tFileSeparator.Length;
+                        StrMessage += tFilePath.Substring(0, IntStartLength) + "..." + tFilePath.Substring(tFilePath.Length - IntEndLength);
                     }
                     else
                     {
-                        StrMessage = " - Analyzed File Count: " + ((Analyzer)sender).intAnalyzerFileCount + " - File: " + ((Analyzer)sender).strCurrentAnalyzerFilePath;
+                        StrMessage += tFilePath;
                     }
                     Console.Write(StrMessage);
                     Console.Write(new string(' ', IntConsoleWidth - StrMessage.Length - 1));
@@ -100,19 +121,45 @@ namespace Stash.Discover
                 {
                     Console.CursorLeft = 1; Console.CursorTop = this.ErrorRow;
                     string tErrMsg = ((Scanner)sender).strErrorMessage;
-                    if (tErrMsg.Length > IntConsoleWidth - 10)
+                    string tHeader = "  | Message  | ";
+                    string tMessageSeparator = "...";
+                    int availMessageLength = IntConsoleWidth - IntBuffer - tHeader.Length;
+                    StrMessage = tHeader;
+                    if (tErrMsg.Length > availMessageLength)
                     {
-                        Console.Write(tErrMsg.Substring(0, 25) + "..." + tErrMsg.Substring(tErrMsg.Length - 80));
+                        // Get some substring of tDirPath that fits in availMessageLength (e.g. 30% of first, 70% of last)?
+                        int IntStartLength = (int)Math.Floor((double)(availMessageLength * .3));
+                        int IntEndLength = availMessageLength - IntStartLength - tMessageSeparator.Length;
+                        StrMessage += tErrMsg.Substring(0, IntStartLength) + "..." + tErrMsg.Substring(tErrMsg.Length - IntEndLength);
                     }
+                    else
+                    {
+                        StrMessage += tErrMsg;
+                    }
+                    Console.Write(StrMessage);
+                    Console.Write(new string(' ', IntConsoleWidth - StrMessage.Length - 1));
                 }
                 if (e.PropertyName == "strAnalyzerErrorMessage")
                 {
                     Console.CursorLeft = 1; Console.CursorTop = this.ErrorRow;
                     string tErrMsg = ((Analyzer)sender).strAnalyzerErrorMessage;
-                    if (tErrMsg.Length > IntConsoleWidth - 10)
+                    string tHeader = "  | Message | ";
+                    string tMessageSeparator = "...";
+                    int availMessageLength = IntConsoleWidth - IntBuffer - tHeader.Length;
+                    StrMessage = tHeader;
+                    if (tErrMsg.Length > availMessageLength)
                     {
-                        Console.Write(tErrMsg.Substring(0, 25) + "..." + tErrMsg.Substring(tErrMsg.Length - 80));
+                        // Get some substring of tDirPath that fits in availMessageLength (e.g. 30% of first, 70% of last)?
+                        int IntStartLength = (int)Math.Floor((double)(availMessageLength * .3));
+                        int IntEndLength = availMessageLength - IntStartLength - tMessageSeparator.Length;
+                        StrMessage += tErrMsg.Substring(0, IntStartLength) + "..." + tErrMsg.Substring(tErrMsg.Length - IntEndLength);
                     }
+                    else
+                    {
+                        StrMessage += tErrMsg;
+                    }
+                    Console.Write(StrMessage);
+                    Console.Write(new string(' ', IntConsoleWidth - StrMessage.Length - 1));
                 }
             }
             catch (Exception)
@@ -200,7 +247,7 @@ namespace Stash.Discover
         {
             this.ScannerRow = Console.CursorTop;            // Scanner output first
             this.AnalyzerRow = Console.CursorTop + 1;       // Line below scanner output for analyzer output
-            this.ErrorRow = Console.CursorTop + 1;
+            this.ErrorRow = Console.CursorTop + 2;
         }
 
         public int getConsoleNextLine()
