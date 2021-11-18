@@ -253,19 +253,30 @@ namespace Stash.Discover
 
         protected void ManualCancel(object sender, ConsoleCancelEventArgs args)
         {
-            Console.CursorTop = this.output.getConsoleNextLine() + 1;
+            Monitor.Enter(this.output);
+            int IntCursorPosition = this.output.getConsoleNextLine() + 1;
+            Console.CursorTop = IntCursorPosition; Console.CursorLeft = 0;
             Console.WriteLine("Shutting down Discover...");
+            Monitor.Exit(this.output);
 
             // Kill scanner
+            Monitor.Enter(this.output);
+            Console.CursorTop = IntCursorPosition + 1; Console.CursorLeft = 0;
             Console.WriteLine("Killing scanner processs...");
+            Monitor.Exit(this.output);
             this.scanner.continueRunning = false;
             Task.WaitAll(this.taskScanner);
 
             // Kill analyzer
+            Monitor.Enter(this.output);
+            Console.CursorTop = IntCursorPosition + 2; Console.CursorLeft = 0;
             Console.WriteLine("Killing analyzer process...");
+            Monitor.Exit(this.output);
             this.analyzer.continueRunning = false;
             Task.WaitAll(this.taskAnalyzer);
 
+            // Finalize Output file
+            Console.CursorTop = IntCursorPosition + 3; Console.CursorLeft = 0;
             Console.WriteLine("Finalizing output file...");
             this.output.finishOutputFile(this.outputFile);
 
